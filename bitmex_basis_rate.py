@@ -78,7 +78,7 @@ def GetContractExpirations(start_date, num_days):
   # Get the futures and expirations we are interested in.
   end_date = start_date + datetime.timedelta(days=num_days)
   years= list(range(start_date.year, end_date.year)) + [end_date.year]
-  years_suffix = [year - 2000 for year in years]
+  years_suffix = (year - 2000 for year in years)
   contract_expirations = {}
   for year in years_suffix:
     for future, month in CONTRACT_EXPIRATION_MONTH.items():
@@ -88,13 +88,15 @@ def GetContractExpirations(start_date, num_days):
   return contract_expirations
 
 
-def GetPrices(contracts, start_date, num_days):
+def GetPrices(contract_expirations, start_date, num_days):
   # Get the index prices and all futures prices
   index_prices = GetBTCDailyPrices(INDEX_SYMBOL, start_date, num_days)
   futures_prices = {}
-  for contract in contracts.keys():
-    # TODO: reduce the range to ones the contract is valid.
-    futures_prices[contract] = GetBTCDailyPrices(contract, start_date, num_days)
+  for contract, expiry in contract_expirations.items():
+    days_to_expiry = (expiry - start_date).days
+    if days_to_expiry > 0:
+      futures_prices[contract] = GetBTCDailyPrices(
+          contract, start_date, days_to_expiry)
   return index_prices, futures_prices
 
 
