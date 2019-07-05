@@ -25,8 +25,14 @@ def GetDate(str_datetime):
   return dt.date()
 
 
-def GetBTCDailyPrices(symbol, start_date, num_days):
-  """Daily price is the closing price of the Bitmex .BXBT index.
+def GetDailyData(base_url, start_date, num_days, callback):
+  """Get the daily data from the base url endpoint.
+
+  Args:
+    base_url: API url to call that can take start and end dates.
+    start_date: datetime to start getting data
+    num_days: number of days to add to start_date to use as end date
+    callback: function which takes as an argument the json results of the api.
   """
   # constants
   max_query_days = 500
@@ -39,22 +45,26 @@ def GetBTCDailyPrices(symbol, start_date, num_days):
   while start_date < final_date:
     start_str = start_date.isoformat()
     end_str = end_date.isoformat()
-    url = ('https://www.bitmex.com/api/v1/trade/bucketed?binSize=1d&partial=false'
-           '&symbol=%s&reverse=false&startTime=%s&endTime=%s') % (
-           symbol, start_str, end_str)
+    url = base_url + '&startTime=%s&endTime=%s' % (start_str, end_str)
     # don't make too many http requests
     time.sleep(2)
     with urllib.request.urlopen(url) as conn:
       daily_data = json.loads(conn.read())
-      for daily in daily_data:
-        prices[GetDate(daily['timestamp'])] = daily['close']
     if len(daily_data) == 0:
       # no more data for this symbol
       break
+    callback(daily_data)
     start_date = start_date + datetime.timedelta(days=len(daily_data))
     query_days = min((final_date - start_date).days, max_query_days)
     end_date = start_date + datetime.timedelta(days=query_days)
-  return prices
+
+
+def GetBTCDailyPrices(symbol, start_date, num_days):
+  base_url = ('https://www.bitmex.com/api/v1/trade/bucketed?binSize=1d'
+              '&partial=false&symbol=%s&reverse=false') % symbol
+  daily_data = []
+  GetDailyData(base_url, start_date, num_days, lambda x: daily_data.extend(x))
+  return {GetDate(daily['timestamp']): daily['close'] for daily in daily_data}
 
 
 def GetDailyBasis(expiration_date, daily_prices, daily_index_prices):
