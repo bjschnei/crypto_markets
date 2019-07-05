@@ -25,14 +25,14 @@ def GetDate(str_datetime):
   return dt.date()
 
 
-def GetDailyData(base_url, start_date, num_days, callback):
+def GetDailyData(base_url, start_date, num_days, on_data):
   """Get the daily data from the base url endpoint.
 
   Args:
     base_url: API url to call that can take start and end dates.
     start_date: datetime to start getting data
     num_days: number of days to add to start_date to use as end date
-    callback: function which takes as an argument the json results of the api.
+    on_data: function which takes as an argument the json results of the api.
   """
   # constants
   max_query_days = 500
@@ -53,7 +53,7 @@ def GetDailyData(base_url, start_date, num_days, callback):
     if len(daily_data) == 0:
       # no more data for this symbol
       break
-    callback(daily_data)
+    on_data(daily_data)
     start_date = start_date + datetime.timedelta(days=len(daily_data))
     query_days = min((final_date - start_date).days, max_query_days)
     end_date = start_date + datetime.timedelta(days=query_days)
@@ -62,9 +62,24 @@ def GetDailyData(base_url, start_date, num_days, callback):
 def GetBTCDailyPrices(symbol, start_date, num_days):
   base_url = ('https://www.bitmex.com/api/v1/trade/bucketed?binSize=1d'
               '&partial=false&symbol=%s&reverse=false') % symbol
-  daily_data = []
-  GetDailyData(base_url, start_date, num_days, lambda x: daily_data.extend(x))
-  return {GetDate(daily['timestamp']): daily['close'] for daily in daily_data}
+  daily_prices = {}
+  def UpdatePrices(daily_data):
+    daily_prices.update(
+        {GetDate(daily['timestamp']): daily['close'] for daily in daily_data})
+  GetDailyData(base_url, start_date, num_days, UpdatePrices)
+  return daily_prices
+
+
+def GetDailyFunding(symbol, start_date, num_days):
+  base_url = ('https://www.bitmex.com/api/v1/funding?symbol=%s'
+              '&reverse=false') % symbol
+  daily_funding = {}
+  def UpdateFunding(daily_data):
+    daily_funding.update(
+        {GetDate(daily['timestamp']): daily['fundingRateDaily']
+         for daily in daily_data})
+  GetDailyData(base_url, start_date, num_days, UpdateFunding)
+  return daily_funding
 
 
 def GetDailyBasis(expiration_date, daily_prices, daily_index_prices):
@@ -121,6 +136,7 @@ def GetBasisRates(contract_expirations, futures_prices, index_prices):
 
 if __name__ == '__main__':
   num_days = 500
+  num_days = 50
   end_date = datetime.date.today() - datetime.timedelta(days=1)
   start_date = end_date - datetime.timedelta(days=num_days)
   contract_expirations = GetContractExpirations(start_date, num_days)
@@ -128,7 +144,9 @@ if __name__ == '__main__':
                                            start_date, num_days)
   futures_basis = GetBasisRates(contract_expirations, futures_prices,
                                 index_prices)
+  daily_funding = GetDailyFunding('XBTUSD', start_date, num_days)
   for contract, basis in futures_basis.items():
     print(contract)
     print(basis)
     print(futures_prices[contract])
+    print(daily_funding)
