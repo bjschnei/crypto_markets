@@ -1,3 +1,4 @@
+import collections
 import datetime
 import json
 import urllib.request
@@ -11,7 +12,8 @@ CONTRACT_EXPIRATION_MONTH = {
   'XBTU': 9,
   'XBTZ': 12,
 }
-EXPIRATION_DAY_OF_MONTH = 27
+ContractDetails = collections.namedtuple(
+    'ContractDetails', ['listing', 'expiry'])
 
 
 def GetDate(str_datetime):
@@ -51,10 +53,9 @@ def GetDailyData(base_url, start_date, num_days, on_data):
     time.sleep(2)
     with urllib.request.urlopen(url) as conn:
       daily_data = json.loads(conn.read())
-    if len(daily_data) == 0:
-      # no more data for this symbol
-      break
     num_entries = on_data(daily_data)
+    if num_entries == 0:
+      break
     start_date = start_date + datetime.timedelta(days=num_entries)
     query_days = min((final_date - start_date).days, max_query_days)
     end_date = start_date + datetime.timedelta(days=query_days)
@@ -62,10 +63,9 @@ def GetDailyData(base_url, start_date, num_days, on_data):
 
 def GetBTCDailyPrices(symbol, start_date, num_days):
   base_url = ('https://www.bitmex.com/api/v1/trade/bucketed?binSize=1d'
-              '&partial=false&symbol=%s&reverse=false') % symbol
+              '&symbol=%s') % symbol
   daily_prices = {}
   def UpdatePrices(daily_data):
-    start_len = len(daily_prices)
     daily_prices.update(
         {GetDate(daily['timestamp']): daily['close'] for daily in daily_data})
     return len(daily_data)
@@ -77,6 +77,7 @@ def GetDailyFunding(symbol, start_date, num_days):
   base_url = ('https://www.bitmex.com/api/v1/funding?symbol=%s') % symbol
   daily_funding = {}
   def UpdateFunding(daily_data):
+    # more than 1 funding entry per day
     start_len = len(daily_funding)
     daily_funding.update(
         {GetDate(daily['timestamp']): daily['fundingRateDaily']
@@ -103,26 +104,33 @@ def GetDailyBasis(expiration_date, daily_prices, daily_index_prices):
   return daily_basis
 
 
-def GetContractExpirations(start_date, num_days):
+def GetContractDetails(start_date, num_days):
   # Get the futures and expirations we are interested in.
   end_date = start_date + datetime.timedelta(days=num_days)
   years= list(range(start_date.year, end_date.year)) + [end_date.year]
   years_suffix = (year - 2000 for year in years)
-  contract_expirations = {}
+  contract_details = {}
   for year in years_suffix:
     for future, month in CONTRACT_EXPIRATION_MONTH.items():
-      contract_expirations[future + str(year)] = (
-          datetime.date(month=month, day=EXPIRATION_DAY_OF_MONTH,
-                        year=2000 + int(year)))
-  return contract_expirations
+      symbol = future + str(year)
+      url = 'https://www.bitmex.com/api/v1/instrument?symbol=' + symbol
+      time.sleep(2)
+      with urllib.request.urlopen(url) as conn:
+        details = json.loads(conn.read())[0]
+      contract_details[future + str(year)] = ContractDetails(
+          GetDate(details['listing']), GetDate(details['expiry']))
+  return contract_details
 
 
-def GetPrices(contract_expirations, start_date, num_days):
+def GetPrices(contract_details, start_date, num_days):
   # Get the index prices and all futures prices
   index_prices = GetBTCDailyPrices(INDEX_SYMBOL, start_date, num_days)
   futures_prices = {}
-  for contract, expiry in contract_expirations.items():
-    days_to_expiry = (expiry - start_date).days
+  for contract, details in contract_details.items():
+    if start_date > details.listing:
+      continue
+    start_date = max(start_date, details.listing)
+    days_to_expiry = (details.expiry - start_date).days
     if days_to_expiry > 0:
       # TODO: Adjust start_date to start date of contract.
       futures_prices[contract] = GetBTCDailyPrices(
@@ -130,12 +138,12 @@ def GetPrices(contract_expirations, start_date, num_days):
   return index_prices, futures_prices
 
 
-def GetBasisRates(contract_expirations, futures_prices, index_prices):
+def GetBasisRates(contract_details, futures_prices, index_prices):
   # Get the daily basis for each future
   futures_basis = {}
   for contract, prices in futures_prices.items():
     futures_basis[contract] = GetDailyBasis(
-        contract_expirations[contract], prices, index_prices)
+        contract_details[contract].expiry, prices, index_prices)
   return futures_basis
 
 
@@ -143,10 +151,10 @@ if __name__ == '__main__':
   num_days = 500
   end_date = datetime.date.today() - datetime.timedelta(days=1)
   start_date = end_date - datetime.timedelta(days=num_days)
-  contract_expirations = GetContractExpirations(start_date, num_days)
-  index_prices, futures_prices = GetPrices(contract_expirations,
+  contract_details = GetContractDetails(start_date, num_days)
+  index_prices, futures_prices = GetPrices(contract_details,
                                            start_date, num_days)
-  futures_basis = GetBasisRates(contract_expirations, futures_prices,
+  futures_basis = GetBasisRates(contract_details, futures_prices,
                                 index_prices)
   daily_funding = GetDailyFunding('XBTUSD', start_date, num_days)
   for contract, basis in futures_basis.items():
