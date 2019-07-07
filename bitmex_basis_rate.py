@@ -14,6 +14,8 @@ CONTRACT_EXPIRATION_MONTH = {
 }
 ContractDetails = collections.namedtuple(
     'ContractDetails', ['listing', 'expiry'])
+OHLCV = collections.namedtuple(
+    'OHLCV', ['open', 'high', 'low', 'close', 'volume'])
 
 
 def GetDate(str_datetime):
@@ -53,13 +55,17 @@ def GetDailyData(base_url, start_date, num_days, on_data):
     start_date = last_date + datetime.timedelta(days=1)
 
 
+def MakeOHCLV(daily_data):
+  return OHLCV(daily_data['open'], daily_data['high'], daily_data['low'],
+               daily_data['close'], daily_data['volume'])
+
 def GetBTCDailyPrices(symbol, start_date, num_days):
   base_url = ('https://www.bitmex.com/api/v1/trade/bucketed?binSize=1d'
               '&symbol=%s') % symbol
   daily_prices = {}
   def UpdatePrices(daily_data):
     daily_prices.update(
-        {GetDate(daily['timestamp']): daily['close'] for daily in daily_data})
+        {GetDate(daily['timestamp']): MakeOHCLV(daily) for daily in daily_data})
     return None if not daily_data else GetDate(daily_data[-1]['timestamp'])
   GetDailyData(base_url, start_date, num_days, UpdatePrices)
   return daily_prices
@@ -85,7 +91,8 @@ def GetDailyBasis(expiration_date, daily_prices, daily_index_prices):
       continue
     try:
       daily_basis[day] = (
-          (price / daily_index_prices[day] - 1) / (expiry.days / 365)
+          (price.close / daily_index_prices[day].close - 1) / (
+               expiry.days / 365)
       )
     except KeyError:
       # No price for the given day
@@ -139,16 +146,15 @@ def GetBasisRates(contract_details, futures_prices, index_prices):
 
 if __name__ == '__main__':
   num_days = 365 * 4
+  num_days = 30
   end_date = datetime.date.today() - datetime.timedelta(days=1)
   start_date = end_date - datetime.timedelta(days=num_days)
   contract_details = GetContractDetails(start_date, num_days)
   index_prices, futures_prices = GetPrices(contract_details,
                                            start_date, num_days)
-  futures_basis = GetBasisRates(contract_details, futures_prices,
-                                index_prices)
+  futures_basis = GetBasisRates(contract_details, futures_prices, index_prices)
   daily_funding = GetDailyFunding('XBTUSD', start_date, num_days)
-  for contract, basis in futures_basis.items():
-    print(contract)
-    print(basis)
-    print(futures_prices[contract])
+  print(index_prices)
+  print(futures_prices)
   print(daily_funding)
+  print(futures_basis)
