@@ -55,7 +55,7 @@ def GetDailyData(base_url, start_date, num_days, on_data):
     start_date = last_date + datetime.timedelta(days=1)
 
 
-def MakeOHCLV(daily_data):
+def MakeOHLCV(daily_data):
   return OHLCV(daily_data['open'], daily_data['high'], daily_data['low'],
                daily_data['close'], daily_data['volume'])
 
@@ -65,7 +65,7 @@ def GetBTCDailyPrices(symbol, start_date, num_days):
   daily_prices = {}
   def UpdatePrices(daily_data):
     daily_prices.update(
-        {GetDate(daily['timestamp']): MakeOHCLV(daily) for daily in daily_data})
+        {GetDate(daily['timestamp']): MakeOHLCV(daily) for daily in daily_data})
     return None if not daily_data else GetDate(daily_data[-1]['timestamp'])
   GetDailyData(base_url, start_date, num_days, UpdatePrices)
   return daily_prices
@@ -146,7 +146,6 @@ def GetBasisRates(contract_details, futures_prices, index_prices):
 
 if __name__ == '__main__':
   num_days = 365 * 4
-  num_days = 30
   end_date = datetime.date.today() - datetime.timedelta(days=1)
   start_date = end_date - datetime.timedelta(days=num_days)
   contract_details = GetContractDetails(start_date, num_days)
