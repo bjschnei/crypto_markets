@@ -3,7 +3,7 @@ import requests_html
 def GetTradeFileUrls():
   session = requests_html.HTMLSession()
 
-  # Find the trade link
+  # Find the trade link, just in case it changes
   r = session.get('https://public.bitmex.com')
   r.html.render(sleep=1)
   listing = r.html.find('#listing', first=True)
@@ -15,6 +15,7 @@ def GetTradeFileUrls():
   if trade_link is None:
     raise Exception('Trade link not found')
 
+  # Get all the files gzip trade files
   r = session.get(trade_link)
   r.html.render(sleep=1)
   listing = r.html.find('#listing', first=True)
