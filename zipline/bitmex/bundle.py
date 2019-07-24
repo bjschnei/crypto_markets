@@ -20,7 +20,7 @@ class BitmexDataProvider(object):
 
   async def LoadData(self):
     async for frame in self._ConvertFilesToDataFrames():
-      return frame
+      yield frame
 
   async def _ConvertFilesToDataFrames(self):
     for url in await self._GetTradeFileUrls():
@@ -58,8 +58,9 @@ class BitmexDataProvider(object):
 
 
 async def main():
-  bmdp = BitmexDataProvider(10)
-  print(await bmdp.LoadData())
+  bmdp = BitmexDataProvider(2)
+  async for data in bmdp.LoadData():
+    print(data)
   await bmdp.Close()
 
 
@@ -67,5 +68,8 @@ if __name__ == '__main__':
   event_loop = asyncio.get_event_loop()
   try:
     event_loop.run_until_complete(main())
+    pending_tasks = [
+      task for task in asyncio.Task.all_tasks() if not task.done()]
+    event_loop.run_until_complete(asyncio.gather(*pending_tasks))
   finally:
     event_loop.close()
