@@ -1,4 +1,6 @@
 import asyncio
+import datetime
+import enum
 import gzip
 import io
 import os
@@ -6,10 +8,14 @@ import tempfile
 import urllib
 import shutil
 
-import pandas
+import pandas as pd
 import requests_html
 
 class BitmexDataProvider(object):
+
+  class Granularity(enum.Enum):
+    HOUR = 1
+    MINUTE = 2
 
   def __init__(self, num_days):
     self._num_days = num_days
@@ -18,14 +24,25 @@ class BitmexDataProvider(object):
   async def Close(self):
     await self._session.close()
 
-  async def LoadData(self):
-    async for frame in self._ConvertFilesToDataFrames():
-      yield frame
+  async def LoadData(self, granularity=Granularity.HOUR):
+    async for df in self._ConvertFilesToDataFrames():
+      df['timestamp'] = pd.to_datetime(df['timestamp'],
+                                       format='%Y-%m-%dD%H:%M:%S.%f')
+      df['hour'] = df['timestamp'].map(lambda x:x.hour)
+      df['minute'] = df['timestamp'].map(lambda x:x.minute)
+      if granularity is self.Granularity.HOUR:
+        group = df.groupby(['symbol', 'hour'])
+      else:
+        group = df.groupby(['symbol', 'hour', 'minute'])
+      ohlcv = group.agg(
+          {'price': ['first', 'max', 'min', 'last',], 'size': 'sum'})
+      # TODO: add date to ohlcv data.
+      yield ohlcv
 
   async def _ConvertFilesToDataFrames(self):
     for url in await self._GetTradeFileUrls():
       with urllib.request.urlopen(url) as response:
-        yield pandas.read_csv(io.BytesIO(gzip.decompress(response.read())))
+        yield pd.read_csv(io.BytesIO(gzip.decompress(response.read())))
 
   async def _GetTradeFileUrls(self):
     # Find the trade link, just in case it changes
