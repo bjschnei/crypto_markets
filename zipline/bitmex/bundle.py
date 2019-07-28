@@ -2,6 +2,8 @@ from zipline.data import bundles
 
 import provider
 
+DEFAULT_NUM_DAYS = 5
+
 def ingest(environ,
            asset_db_writer,
            minute_bar_writer,
@@ -13,6 +15,8 @@ def ingest(environ,
            cache,
            show_progress,
            output_dir):
-  print(environ)
+  num_days = environ.get('NUM_DAYS', DEFAULT_NUM_DAYS)
+  bitmex_provider = provider.BitmexDataProvider(num_days)
 
-bundles.register('BITMEX', ingest)
+
+bundles.register('bitmex', ingest)
