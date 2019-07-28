@@ -14,8 +14,9 @@ import requests_html
 class BitmexDataProvider(object):
 
   class Granularity(enum.Enum):
-    HOUR = 1
-    MINUTE = 2
+    DAY = 1
+    HOUR = 2
+    MINUTE = 3
 
   def __init__(self, num_days):
     self._num_days = num_days
@@ -28,15 +29,17 @@ class BitmexDataProvider(object):
     async for df in self._ConvertFilesToDataFrames():
       df['timestamp'] = pd.to_datetime(df['timestamp'],
                                        format='%Y-%m-%dD%H:%M:%S.%f')
+      df['date'] = df['timestamp'].map(lambda x:x.date())
       df['hour'] = df['timestamp'].map(lambda x:x.hour)
       df['minute'] = df['timestamp'].map(lambda x:x.minute)
-      if granularity is self.Granularity.HOUR:
-        group = df.groupby(['symbol', 'hour'])
-      else:
-        group = df.groupby(['symbol', 'hour', 'minute'])
+      if granularity is self.Granularity.DAY:
+        group = df.groupby(['symbol', 'date'])
+      elif granularity is self.Granularity.HOUR:
+        group = df.groupby(['symbol', 'date', 'hour'])
+      else:  # MINUTE
+        group = df.groupby(['symbol', 'date', 'hour', 'minute'])
       ohlcv = group.agg(
           {'price': ['first', 'max', 'min', 'last',], 'size': 'sum'})
-      # TODO: add date to ohlcv data.
       yield ohlcv
 
   async def _ConvertFilesToDataFrames(self):
