@@ -15,11 +15,8 @@ def ingest(environ,
            cache,
            show_progress,
            output_dir):
-  print(start_session)
-  print(end_session)
-  print(type(start_session))
-  # TODO: BitmexDataProvider needs to take start/end as args
-  # bitmex_provider = provider.BitmexDataProvider(1)
+  bitmex_provider = provider.BitmexDataProvider(start_session, end_session)
+  print(output_dir)
 
 
 bundles.register('bitmex', ingest)

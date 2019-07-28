@@ -18,8 +18,9 @@ class BitmexDataProvider(object):
     HOUR = 2
     MINUTE = 3
 
-  def __init__(self, num_days):
-    self._num_days = num_days
+  def __init__(self, start_session, end_session):
+    self._start_session = start_session
+    self._end_session = end_session
     self._session = requests_html.AsyncHTMLSession()
 
   async def Close(self):
@@ -73,12 +74,23 @@ class BitmexDataProvider(object):
         break
     if not listing or not listing.links:
       raise Exception("Urls to download not found")
-    links = sorted(link for link in listing.links if link.endswith('gz'))
-    return links[self._num_days * -1:]
+    filtered_links = []
+    for link in listing.links:
+      if not link.endswith('.csv.gz'):
+        continue
+      # date in filename is format YYYYMMDD
+      link_date = link[link.rfind('/') + 1 :link.rfind('.csv')]
+      link_datetime = datetime.datetime.strptime(link_date, '%Y%m%d')
+      if (link_datetime >= self._start_session and
+          link_datetime <= self._end_session):
+        filtered_links.append(link)
+    return sorted(filtered_links)
 
 
 async def main():
-  bmdp = BitmexDataProvider(2)
+  bmdp = BitmexDataProvider(
+      datetime.datetime.now() - datetime.timedelta(days=4),
+      datetime.datetime.now())
   async for data in bmdp.LoadData():
     print(data)
   await bmdp.Close()
