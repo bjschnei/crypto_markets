@@ -7,7 +7,6 @@ import os
 import requests
 import tempfile
 import urllib
-import shutil
 
 import pandas as pd
 import requests_html
