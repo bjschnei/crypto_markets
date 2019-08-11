@@ -1,1 +1,3 @@
 PYTHONPATH=. zipline -e bundle.py bundles
+
+PYTHONPATH=. zipline -e bundle.py ingest -b bitmex

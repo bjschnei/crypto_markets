@@ -69,7 +69,7 @@ class BitmexDataProvider(object):
       loop = asyncio.get_event_loop()
       response = await loop.run_in_executor(
           None, requests.get, base_url + symbol)
-      results[symbol] = response.json()
+      results[symbol] = response.json()[0]
     # TODO: probably return a DataFrame.
     return results
 
