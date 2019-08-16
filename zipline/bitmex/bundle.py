@@ -54,14 +54,14 @@ async def LoadData(asset_db_writer, start_session, end_session):
     for asset_detail in asset_details.values():
       detail_data = GetFutureNeededAssetDetails(asset_detail)
       if detail_data is not None:
+        # futures sid is the futures_df.index
         new_details_df = new_details_df.append(
-          pd.DataFrame(pd.Series(detail_data)).T)
+          pd.DataFrame(pd.Series(detail_data)).T, ignore_index=True)
     futures_df = futures_df.append(new_details_df).drop_duplicates()
 
 
   root_symbols_df = futures_df[['root_symbol', 'exchange']].drop_duplicates()
   root_symbols_df['root_symbol_id'] = root_symbols_df['root_symbol'].apply(hash)
-  # futures sid...wtf is it..need to figure out how to set it.
   asset_db_writer.write(futures=futures_df,
                         root_symbols=root_symbols_df)
   await bmdp.Close()
