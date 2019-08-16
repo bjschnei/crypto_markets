@@ -27,33 +27,43 @@ def GetFutureNeededAssetDetails(asset_details):
   Returns:
     None if the Asset isn't a future
   """
+  #print('*' * 80)
+  #print(asset_details)
   if asset_details['expiry'] is None:
     return None
   # print(asset_details)
+  expiry_date = ConvertBitmexDateTime(asset_details['expiry'])
   return {
     'exchange': 'BITMEX',
     'symbol': asset_details['symbol'],
     'root_symbol': asset_details['rootSymbol'],
     'asset_name': asset_details['underlying'],
     'notice_date': ConvertBitmexDateTime(asset_details['listing']),
-    'expiration_date': ConvertBitmexDateTime(asset_details['expiry']),
-    'auto_close_date': ConvertBitmexDateTime(asset_details['expiry']),
+    'expiration_date': expiry_date,
+    'auto_close_date': expiry_date + datetime.timedelta(days=1),
     'tick_size': asset_details['tickSize'],
     'multiplier': asset_details['multiplier']
   }
 
 async def LoadData(asset_db_writer, start_session, end_session):
   bmdp = provider.BitmexDataProvider(start_session, end_session)
+  futures_df = pd.DataFrame()
   async for ohlcv in bmdp.LoadData():
-    # print(ohlcv)
-    print('*' * 80)
+    new_details_df = pd.DataFrame()
     asset_details = await bmdp.GetAssetDetails(ohlcv)
-    asset_details = collections.defaultdict(list)
-    for k,v in asset_details.items():
-      for k,v in GetFutureNeededAssetDetails(v).items():
-        asset_details[k].append(v)
+    for asset_detail in asset_details.values():
+      detail_data = GetFutureNeededAssetDetails(asset_detail)
+      if detail_data is not None:
+        new_details_df = new_details_df.append(
+          pd.DataFrame(pd.Series(detail_data)).T)
+    futures_df = futures_df.append(new_details_df).drop_duplicates()
 
-    asset_db_writer.write(futures=pd.DataFrame(asset_details))
+
+  root_symbols_df = futures_df[['root_symbol', 'exchange']].drop_duplicates()
+  root_symbols_df['root_symbol_id'] = root_symbols_df['root_symbol'].apply(hash)
+  # futures sid...wtf is it..need to figure out how to set it.
+  asset_db_writer.write(futures=futures_df,
+                        root_symbols=root_symbols_df)
   await bmdp.Close()
 
 
