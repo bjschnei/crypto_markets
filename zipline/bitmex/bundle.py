@@ -45,7 +45,8 @@ def GetFutureNeededAssetDetails(asset_details):
     'multiplier': asset_details['multiplier']
   }
 
-async def LoadData(asset_db_writer, start_session, end_session):
+async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
+                   start_session, end_session):
   bmdp = provider.BitmexDataProvider(start_session, end_session)
   futures_df = pd.DataFrame()
   async for ohlcv in bmdp.LoadData():
@@ -57,8 +58,18 @@ async def LoadData(asset_db_writer, start_session, end_session):
         # futures sid is the futures_df.index
         new_details_df = new_details_df.append(
           pd.DataFrame(pd.Series(detail_data)).T, ignore_index=True)
-    futures_df = futures_df.append(new_details_df).drop_duplicates()
-
+    futures_df = (
+        futures_df.append(new_details_df)
+        .drop_duplicates()
+        .rename_axis('sid')
+    )
+    print(ohlcv)
+    print(futures_df)
+    # TODO: join the ohlcv data with the sid of the asset.
+    # Write out the daily bar data.
+    # t = ohlcv.merge_join(futures_df, left_on='symbol', right_on='symbol')
+    # print(t)
+    #daily_bar_writer.write(show_progress=show_progress)
 
   root_symbols_df = futures_df[['root_symbol', 'exchange']].drop_duplicates()
   root_symbols_df['root_symbol_id'] = root_symbols_df['root_symbol'].apply(hash)
@@ -85,7 +96,8 @@ def ingest(environ,
   event_loop = asyncio.get_event_loop()
   try:
     event_loop.run_until_complete(
-      LoadData(asset_db_writer, start_session, end_session))
+      LoadData(asset_db_writer, daily_bar_writer, show_progress, start_session,
+               end_session))
   finally:
     pending_tasks = [
       task for task in asyncio.Task.all_tasks() if not task.done()]
