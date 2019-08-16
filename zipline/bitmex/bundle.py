@@ -1,4 +1,5 @@
 import asyncio
+import collections
 import datetime
 import pytz
 
@@ -28,15 +29,18 @@ def GetFutureNeededAssetDetails(asset_details):
   """
   if asset_details['expiry'] is None:
     return None
-  symbol = asset_details['symbol']
-  root_symbol = asset_details['rootSymbol']
-  asset_name = asset_details['underlying']
-
-  exchange = 'BITMEX'
-  expiration_date = ConvertBitmexDateTime(asset_details['expiry'])
-  auto_close_date = expiration_date
-  tick_size = asset_details['tickSize']
-  multiplier = asset_details['multiplier']
+  # print(asset_details)
+  return {
+    'exchange': 'BITMEX',
+    'symbol': asset_details['symbol'],
+    'root_symbol': asset_details['rootSymbol'],
+    'asset_name': asset_details['underlying'],
+    'notice_date': ConvertBitmexDateTime(asset_details['listing']),
+    'expiration_date': ConvertBitmexDateTime(asset_details['expiry']),
+    'auto_close_date': ConvertBitmexDateTime(asset_details['expiry']),
+    'tick_size': asset_details['tickSize'],
+    'multiplier': asset_details['multiplier']
+  }
 
 async def LoadData(asset_db_writer, start_session, end_session):
   bmdp = provider.BitmexDataProvider(start_session, end_session)
@@ -44,12 +48,12 @@ async def LoadData(asset_db_writer, start_session, end_session):
     # print(ohlcv)
     print('*' * 80)
     asset_details = await bmdp.GetAssetDetails(ohlcv)
+    asset_details = collections.defaultdict(list)
     for k,v in asset_details.items():
-      print('#'*80)
-      print(k)
-      print(v)
-      GetFutureNeededAssetDetails(v)
-    asset_db_writer.write(futures=None)
+      for k,v in GetFutureNeededAssetDetails(v).items():
+        asset_details[k].append(v)
+
+    asset_db_writer.write(futures=pd.DataFrame(asset_details))
   await bmdp.Close()
 
 
