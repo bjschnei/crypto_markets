@@ -63,13 +63,26 @@ async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
         .drop_duplicates()
         .rename_axis('sid')
     )
-    print(ohlcv)
-    print(futures_df)
-    # TODO: join the ohlcv data with the sid of the asset.
-    # Write out the daily bar data.
-    # t = ohlcv.merge_join(futures_df, left_on='symbol', right_on='symbol')
-    # print(t)
-    #daily_bar_writer.write(show_progress=show_progress)
+
+    # TODO ohlcv price data must be 1000x
+    # http://www.zipline.io/appendix.html#writers
+
+    # Join the ohlcv data with the sid of the asset.
+    ohlcv.columns = ohlcv.columns.droplevel()
+    futures_df['sid'] = futures_df.index
+    price_data_df = ohlcv.reset_index().merge(futures_df, on='symbol')
+    price_data_df.set_index('date')
+    price_data_df.rename(columns={
+                         'first': 'open',
+                         'max': 'high',
+                         'min': 'low',
+                         'last': 'close',
+                         'sum': 'volume'
+                         })
+    # Create tuples of (sid, price_data)
+    # price_data must be ordered DESC by datetime.
+
+    # Write out the bar data.
 
   root_symbols_df = futures_df[['root_symbol', 'exchange']].drop_duplicates()
   root_symbols_df['root_symbol_id'] = root_symbols_df['root_symbol'].apply(hash)
