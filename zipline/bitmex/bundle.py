@@ -45,6 +45,41 @@ def GetFutureNeededAssetDetails(asset_details):
     'multiplier': asset_details['multiplier']
   }
 
+
+def GetOHLCVPerSid(ohlcv_df, futures_df):
+  """Produce data that can be passed to the bar writter.
+
+  Args:
+    ohlcv_df: OHLCV data returned by BitmexDataProvider.LoadData
+    futures_df:  Asset details returned by GetFutureNeededAssetDetails
+
+  Returns:
+    list if pairs of sid, ohlcv dataframes
+    dataframe is indexed by timestamp.
+    See format expected by: http://www.zipline.io/appendix.html#writers
+  """
+  # TODO ohlcv price data must be 1000x
+
+  # Join the ohlcv data with the sid of the asset.
+  ohlcv_df.columns = ohlcv_df.columns.droplevel()
+  futures_df['sid'] = futures_df.index
+  price_data_df = ohlcv_df.reset_index().merge(futures_df, on='symbol')
+  price_data_df.rename(inplace=True, columns={
+      'first': 'open',
+      'last': 'close',
+      'max': 'high',
+      'min': 'low',
+      'sum': 'volume'})
+  sid_prices = price_data_df.groupby('sid')
+  return [
+      (sid,
+       df[['date', 'open', 'high', 'low', 'close', 'volume']]
+           .set_index('date')
+      )
+      for sid,df in sid_prices
+  ]
+
+
 async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
                    start_session, end_session):
   bmdp = provider.BitmexDataProvider(start_session, end_session)
@@ -62,29 +97,12 @@ async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
           pd.DataFrame(pd.Series(detail_data)).T, ignore_index=True)
     futures_df = (
         futures_df.append(new_details_df)
-        .drop_duplicates()
         .rename_axis('sid')
+        .drop_duplicates('asset_name')
     )
 
-    # TODO ohlcv price data must be 1000x
-    # http://www.zipline.io/appendix.html#writers
-
-    # Join the ohlcv data with the sid of the asset.
-    ohlcv.columns = ohlcv.columns.droplevel()
-    futures_df['sid'] = futures_df.index
-    price_data_df = ohlcv.reset_index().merge(futures_df, on='symbol')
-    price_data_df.set_index('date')
-    price_data_df.rename(inplace=True, columns={
-        'first': 'open',
-        'last': 'close',
-        'max': 'high',
-        'min': 'low',
-        'sum': 'volume'})
-    sid_prices = price_data_df.groupby('sid')
     daily_bar_writer.write(
-        [(sid, df[['open', 'high', 'low', 'close', 'volume']])
-        for sid,df in sid_prices],
-        show_progress=show_progress)
+        GetOHLCVPerSid(ohlcv, futures_df), show_progress=show_progress)
 
   root_symbols_df = futures_df[['root_symbol', 'exchange']].drop_duplicates()
   root_symbols_df['root_symbol_id'] = root_symbols_df['root_symbol'].apply(hash)
@@ -105,9 +123,6 @@ def ingest(environ,
            show_progress,
            output_dir):
   # hard code for just 1 day for now
-  start_session = pd.Timestamp(datetime.date(2019, 8, 9))
-  end_session = pd.Timestamp(datetime.date(2019, 8, 9))
-
   event_loop = asyncio.get_event_loop()
   try:
     event_loop.run_until_complete(
@@ -120,4 +135,9 @@ def ingest(environ,
     event_loop.close()
 
 
-bundles.register('bitmex', ingest)
+bundles.register(
+    'bitmex',
+    ingest,
+    start_session = pd.Timestamp(pytz.utc.localize(datetime.datetime(2019, 8, 7))),
+    end_session = pd.Timestamp(pytz.utc.localize(datetime.datetime(2019, 8, 9)))
+)

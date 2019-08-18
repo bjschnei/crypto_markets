@@ -4,6 +4,7 @@ import enum
 import gzip
 import io
 import os
+import pytz
 import requests
 import tempfile
 import urllib
@@ -110,7 +111,8 @@ class BitmexDataProvider(object):
         continue
       # date in filename is format YYYYMMDD
       link_date = link[link.rfind('/') + 1 :link.rfind('.csv')]
-      link_datetime = datetime.datetime.strptime(link_date, '%Y%m%d')
+      link_datetime = pytz.utc.localize(
+          datetime.datetime.strptime(link_date, '%Y%m%d'))
       if (link_datetime >= self._start_session and
           link_datetime <= self._end_session):
         filtered_links.append(link)
