@@ -49,7 +49,9 @@ async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
                    start_session, end_session):
   bmdp = provider.BitmexDataProvider(start_session, end_session)
   futures_df = pd.DataFrame()
-  async for ohlcv in bmdp.LoadData():
+  # TODO: Pass granularity at command line.
+  async for ohlcv in bmdp.LoadData(
+      granularity=provider.BitmexDataProvider.Granularity.DAY):
     new_details_df = pd.DataFrame()
     asset_details = await bmdp.GetAssetDetails(ohlcv)
     for asset_detail in asset_details.values():
@@ -72,17 +74,17 @@ async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
     futures_df['sid'] = futures_df.index
     price_data_df = ohlcv.reset_index().merge(futures_df, on='symbol')
     price_data_df.set_index('date')
-    price_data_df.rename(columns={
-                         'first': 'open',
-                         'max': 'high',
-                         'min': 'low',
-                         'last': 'close',
-                         'sum': 'volume'
-                         })
-    # Create tuples of (sid, price_data)
-    # price_data must be ordered DESC by datetime.
-
-    # Write out the bar data.
+    price_data_df.rename(inplace=True, columns={
+        'first': 'open',
+        'last': 'close',
+        'max': 'high',
+        'min': 'low',
+        'sum': 'volume'})
+    sid_prices = price_data_df.groupby('sid')
+    daily_bar_writer.write(
+        [(sid, df[['open', 'high', 'low', 'close', 'volume']])
+        for sid,df in sid_prices],
+        show_progress=show_progress)
 
   root_symbols_df = futures_df[['root_symbol', 'exchange']].drop_duplicates()
   root_symbols_df['root_symbol_id'] = root_symbols_df['root_symbol'].apply(hash)
