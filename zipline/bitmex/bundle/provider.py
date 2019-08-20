@@ -24,6 +24,7 @@ class BitmexDataProvider(object):
     self._end_session = end_session
     self._session = requests_html.AsyncHTMLSession()
     self._trade_file_urls = None
+    self._cached_asset_details = {}
 
   async def Close(self):
     """Closes the underlying requests_html session."""
@@ -63,16 +64,17 @@ class BitmexDataProvider(object):
     Args:
       ohlcv: DataFrame returned by LoadData
     """
-    # ohlcv is a Data
     results = {}
     symbols = set(ohlcv.index.get_level_values(level=0))
     base_url = 'https://www.bitmex.com/api/v1/instrument?symbol='
     for symbol in symbols:
-      loop = asyncio.get_event_loop()
-      response = await loop.run_in_executor(
-          None, requests.get, base_url + symbol)
-      results[symbol] = response.json()[0]
-    # TODO: probably return a DataFrame.
+      details = self._cached_asset_details.get(symbol)
+      if details is None:
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None, requests.get, base_url + symbol)
+        self._cached_asset_details[symbol] = response.json()[0]
+      results[symbol] = self._cached_asset_details[symbol]
     return results
 
   async def _ConvertFilesToDataFrames(self):

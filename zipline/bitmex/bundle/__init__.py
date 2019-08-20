@@ -89,7 +89,7 @@ async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
   with cli.maybe_show_progress(
       range(len(urls)),
       show_progress=show_progress,
-      label="Loading bitmex data",
+      label="Loading BitMEX data",
       item_show_func=lambda x: urls[x] if x is not None else '') as progress:
     for _ in progress:
       # TODO: Pass granularity at command line.
