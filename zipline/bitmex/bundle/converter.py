@@ -59,8 +59,6 @@ def GetOHLCVPerSid(ohlcv_df, futures_df):
   # TODO ohlcv price data must be 1000x
 
   # Join the ohlcv data with the sid of the asset.
-  ohlcv_df.columns = ohlcv_df.columns.droplevel()
-  futures_df['sid'] = futures_df.index
   price_data_df = ohlcv_df.reset_index().merge(futures_df, on='symbol')
   price_data_df.rename(inplace=True, columns={
       'first': 'open',
@@ -90,6 +88,7 @@ async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
       item_show_func=lambda x: urls[x] if x is not None else '') as progress:
     for _ in progress:
       # TODO: Pass granularity at command line.
+      print('*'*80)
       async for ohlcv in bmdp.LoadData(
           granularity=provider.BitmexDataProvider.Granularity.DAY):
         new_details_df = pd.DataFrame()
@@ -103,9 +102,11 @@ async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
         futures_df = (
             futures_df.append(new_details_df)
             .rename_axis('sid')
-            .drop_duplicates('asset_name')
+            .drop_duplicates('symbol')
         )
-
+        futures_df['sid'] = futures_df.index
+        # flatten the multi-index
+        ohlcv.columns = ohlcv.columns.droplevel()
         daily_bar_writer.write(
             GetOHLCVPerSid(ohlcv, futures_df), show_progress=show_progress)
 

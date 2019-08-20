@@ -42,6 +42,6 @@ def ingest(environ,
 bundles.register(
     'bitmex',
     ingest,
-    start_session=pd.Timestamp(pytz.utc.localize(datetime.datetime(2019, 8, 9))),
+    start_session=pd.Timestamp(pytz.utc.localize(datetime.datetime(2019, 8, 8))),
     end_session=pd.Timestamp(pytz.utc.localize(datetime.datetime(2019, 8, 9))),
 )
