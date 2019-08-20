@@ -7,6 +7,7 @@ PYTHONPATH=. zipline -e bundle run -f first.py  -b bitmex --start 2019-8-7 --end
 
 # See zipline bug workaround for first run to get SPY data
 https://github.com/quantopian/zipline/issues/2488
+Add IEX_PUBLIC_TOKEN=<token> to above commands until fixed.
 
 
 TODO:
