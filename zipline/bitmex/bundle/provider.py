@@ -23,6 +23,7 @@ class BitmexDataProvider(object):
     self._start_session = start_session
     self._end_session = end_session
     self._session = requests_html.AsyncHTMLSession()
+    self._trade_file_urls = None
 
   async def Close(self):
     """Closes the underlying requests_html session."""
@@ -75,11 +76,15 @@ class BitmexDataProvider(object):
     return results
 
   async def _ConvertFilesToDataFrames(self):
-    for url in await self._GetTradeFileUrls():
+    for url in await self.GetTradeFileUrls():
       with urllib.request.urlopen(url) as response:
         yield pd.read_csv(io.BytesIO(gzip.decompress(response.read())))
 
-  async def _GetTradeFileUrls(self):
+  async def GetTradeFileUrls(self):
+    """Return value is cached."""
+    if self._trade_file_urls is not None:
+      return self._trade_file_urls
+
     # Find the trade link, just in case it changes
     for sleep_secs in range(20):
       r = await self._session.get('https://public.bitmex.com')
@@ -116,13 +121,14 @@ class BitmexDataProvider(object):
       if (link_datetime >= self._start_session and
           link_datetime <= self._end_session):
         filtered_links.append(link)
-    return sorted(filtered_links)
+    self._trade_file_urls = sorted(filtered_links)
+    return self._trade_file_urls
 
 
 async def main():
   bmdp = BitmexDataProvider(
-      datetime.datetime.now() - datetime.timedelta(days=4),
-      datetime.datetime.now())
+      pytz.utc.localize(datetime.datetime.now()) - datetime.timedelta(days=4),
+      pytz.utc.localize(datetime.datetime.now()))
   async for ohlcv in bmdp.LoadData():
     print(ohlcv)
     print(await bmdp.GetAssetDetails(ohlcv))

@@ -5,6 +5,7 @@ import pytz
 
 import pandas as pd
 from zipline.data import bundles
+from zipline.utils import cli
 
 import bundle.provider
 
@@ -84,25 +85,32 @@ async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
                    start_session, end_session):
   bmdp = provider.BitmexDataProvider(start_session, end_session)
   futures_df = pd.DataFrame()
-  # TODO: Pass granularity at command line.
-  async for ohlcv in bmdp.LoadData(
-      granularity=provider.BitmexDataProvider.Granularity.DAY):
-    new_details_df = pd.DataFrame()
-    asset_details = await bmdp.GetAssetDetails(ohlcv)
-    for asset_detail in asset_details.values():
-      detail_data = GetFutureNeededAssetDetails(asset_detail)
-      if detail_data is not None:
-        # futures sid is the futures_df.index
-        new_details_df = new_details_df.append(
-          pd.DataFrame(pd.Series(detail_data)).T, ignore_index=True)
-    futures_df = (
-        futures_df.append(new_details_df)
-        .rename_axis('sid')
-        .drop_duplicates('asset_name')
-    )
+  urls = await bmdp.GetTradeFileUrls()
+  with cli.maybe_show_progress(
+      range(len(urls)),
+      show_progress=show_progress,
+      label="Loading bitmex data",
+      item_show_func=lambda x: urls[x] if x is not None else '') as progress:
+    for _ in progress:
+      # TODO: Pass granularity at command line.
+      async for ohlcv in bmdp.LoadData(
+          granularity=provider.BitmexDataProvider.Granularity.DAY):
+        new_details_df = pd.DataFrame()
+        asset_details = await bmdp.GetAssetDetails(ohlcv)
+        for asset_detail in asset_details.values():
+          detail_data = GetFutureNeededAssetDetails(asset_detail)
+          if detail_data is not None:
+            # futures sid is the futures_df.index
+            new_details_df = new_details_df.append(
+              pd.DataFrame(pd.Series(detail_data)).T, ignore_index=True)
+        futures_df = (
+            futures_df.append(new_details_df)
+            .rename_axis('sid')
+            .drop_duplicates('asset_name')
+        )
 
-    daily_bar_writer.write(
-        GetOHLCVPerSid(ohlcv, futures_df), show_progress=show_progress)
+        daily_bar_writer.write(
+            GetOHLCVPerSid(ohlcv, futures_df), show_progress=show_progress)
 
   root_symbols_df = futures_df[['root_symbol', 'exchange']].drop_duplicates()
   root_symbols_df['root_symbol_id'] = root_symbols_df['root_symbol'].apply(hash)
@@ -138,6 +146,6 @@ def ingest(environ,
 bundles.register(
     'bitmex',
     ingest,
-    start_session = pd.Timestamp(pytz.utc.localize(datetime.datetime(2019, 8, 7))),
-    end_session = pd.Timestamp(pytz.utc.localize(datetime.datetime(2019, 8, 9)))
+    start_session=pd.Timestamp(pytz.utc.localize(datetime.datetime(2019, 8, 7))),
+    end_session=pd.Timestamp(pytz.utc.localize(datetime.datetime(2019, 8, 9))),
 )
