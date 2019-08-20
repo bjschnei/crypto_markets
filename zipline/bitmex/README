@@ -1,3 +1,21 @@
 PYTHONPATH=. zipline -e bundle bundles
 
 PYTHONPATH=. zipline -e bundle ingest -b bitmex
+
+PYTHONPATH=. zipline -e bundle run -f first.py  -b bitmex --start 2019-8-7 --end 2019-8-9 -o first_out.pickle
+
+
+# See zipline bug workaround for first run to get SPY data
+https://github.com/quantopian/zipline/issues/2488
+
+
+TODO:
+  https://github.com/quantopian/zipline/issues/2293
+  Write out empty splits data.
+  divs_splits = {'divs': DataFrame(columns=['sid', 'amount',
+                                          'ex_date', 'record_date',
+                                          'declared_date', 'pay_date']),
+               'splits': DataFrame(columns=['sid', 'ratio',
+                                            'effective_date'])}
+adjustment_writer.write(splits=divs_splits['splits'],
+                            dividends=divs_splits['divs'])
