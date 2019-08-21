@@ -4,6 +4,7 @@ import pytz
 
 import pandas as pd
 from zipline.data import bundles
+from zipline.utils import calendars
 
 from bundle import converter
 
@@ -38,10 +39,10 @@ def ingest(environ,
   adjustment_writer.write(
       splits=divs_splits['splits'], dividends=divs_splits['divs'])
 
-
 bundles.register(
     'bitmex',
     ingest,
+    calendar_name='24/7',
     start_session=pd.Timestamp(pytz.utc.localize(datetime.datetime(2019, 8, 8))),
     end_session=pd.Timestamp(pytz.utc.localize(datetime.datetime(2019, 8, 9))),
 )

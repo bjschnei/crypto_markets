@@ -2,21 +2,12 @@ PYTHONPATH=. zipline -e bundle bundles
 
 PYTHONPATH=. zipline -e bundle ingest -b bitmex
 
-PYTHONPATH=. zipline -e bundle run -f first.py  -b bitmex --start 2019-8-7 --end 2019-8-9 -o first_out.pickle
+PYTHONPATH=. zipline -e bundle run -f first.py  -b bitmex --start 2019-8-7 --end 2019-8-9 --trading-calendar="24/7" -o first_out.pickle
 
 
 # See zipline bug workaround for first run to get SPY data
 https://github.com/quantopian/zipline/issues/2488
-Add IEX_PUBLIC_TOKEN=<token> to above commands until fixed.
+Add IEX_PUBLIC_TOKEN=<token> to run command until fixed.
 
-
-TODO:
-  https://github.com/quantopian/zipline/issues/2293
-  Write out empty splits data.
-  divs_splits = {'divs': DataFrame(columns=['sid', 'amount',
-                                          'ex_date', 'record_date',
-                                          'declared_date', 'pay_date']),
-               'splits': DataFrame(columns=['sid', 'ratio',
-                                            'effective_date'])}
-adjustment_writer.write(splits=divs_splits['splits'],
-                            dividends=divs_splits['divs'])
+# This fix is pending for years and needed, not sure what the deal is
+https://github.com/quantopian/zipline/pull/1429/commits/7ec3d9c71e8fe76478d15b088878f82c71d8c1da

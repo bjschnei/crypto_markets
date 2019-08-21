@@ -25,11 +25,8 @@ def GetFutureNeededAssetDetails(asset_details):
   Returns:
     None if the Asset isn't a future
   """
-  #print('*' * 80)
-  #print(asset_details)
   if asset_details['expiry'] is None:
     return None
-  # print(asset_details)
   expiry_date = ConvertBitmexDateTime(asset_details['expiry'])
   return {
     'exchange': 'BITMEX',
@@ -88,7 +85,6 @@ async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
       item_show_func=lambda x: urls[x] if x is not None else '') as progress:
     for _ in progress:
       # TODO: Pass granularity at command line.
-      print('*'*80)
       async for ohlcv in bmdp.LoadData(
           granularity=provider.BitmexDataProvider.Granularity.DAY):
         new_details_df = pd.DataFrame()
@@ -111,7 +107,7 @@ async def LoadData(asset_db_writer, daily_bar_writer, show_progress,
             GetOHLCVPerSid(ohlcv, futures_df), show_progress=show_progress)
 
   root_symbols_df = futures_df[['root_symbol', 'exchange']].drop_duplicates()
-  root_symbols_df['root_symbol_id'] = root_symbols_df['root_symbol'].apply(hash)
+  root_symbols_df['root_symbol_id'] = root_symbols_df.index.values
   asset_db_writer.write(futures=futures_df,
                         root_symbols=root_symbols_df)
   await bmdp.Close()
