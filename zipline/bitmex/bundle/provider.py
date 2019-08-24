@@ -42,9 +42,9 @@ class BitmexDataProvider(object):
     async for df in self._ConvertFilesToDataFrames():
       df['timestamp'] = pd.to_datetime(df['timestamp'],
                                        format='%Y-%m-%dD%H:%M:%S.%f')
-      df['date'] = df['timestamp'].map(lambda x:x.date())
-      df['hour'] = df['timestamp'].map(lambda x:x.hour)
-      df['minute'] = df['timestamp'].map(lambda x:x.minute)
+      df['date'] = df['timestamp'].dt.date
+      df['hour'] = df['timestamp'].dt.hour
+      df['minute'] = df['timestamp'].dt.minute
       if granularity is self.Granularity.DAY:
         group = df.groupby(['symbol', 'date'])
       elif granularity is self.Granularity.HOUR:
